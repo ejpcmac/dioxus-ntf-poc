@@ -8,6 +8,12 @@
 default_job = "clippy-all"
 env.CARGO_TERM_COLOR = "always"
 
+[jobs.serve]
+command = ["cargo", "run", "--package=ntf-srv"]
+need_stdout = true
+background = false
+on_change_strategy = "kill_then_restart"
+
 [jobs.check]
 command = ["cargo", "check"]
 need_stdout = false

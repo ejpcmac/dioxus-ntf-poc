@@ -42,6 +42,9 @@ list = [
     # Commands
     "c:hello",
 
+    # Server
+    "srv",
+
     # Cargo xtasks
     "xt:check",
 

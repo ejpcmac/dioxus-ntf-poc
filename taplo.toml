@@ -3,6 +3,7 @@ include = [
     ".config/*.toml",
     "ntf-cli/**/*.toml",
     "ntf-poc-helpers/**/*.toml",
+    "ntf-srv/**/*.toml",
     "xtask/**/*.toml",
 ]
 exclude = ["**/.cargo/config.toml", "bacon.toml"]
