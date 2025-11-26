@@ -91,7 +91,7 @@ fn check_commits(ctx: &mut Context) {
         if ["main", "develop"].contains(&branch.as_str()) {
             None
         } else {
-            let merge_base = get_merge_base("origin/develop");
+            let merge_base = get_merge_base("origin/main");
             Some(format!("{merge_base}..HEAD"))
         }
     };
@@ -467,7 +467,7 @@ fn get_merge_base(into: &str) -> String {
 
     assert!(
         git_merge_base.status.success(),
-        "Failed to run `git merge-base origin/develop HEAD`"
+        "Failed to run `git merge-base origin/main HEAD`"
     );
 
     String::from_utf8(git_merge_base.stdout)
