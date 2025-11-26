@@ -19,6 +19,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    android-nixpkgs = {
+      url = "github:tadfisher/android-nixpkgs/stable";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     git-z = {
       url = "https://flakehub.com/f/ejpcmac/git-z/*";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -36,11 +41,32 @@
         let
           overlays = [ (import inputs.rust-overlay) ];
           pkgs = import inputs.nixpkgs { inherit system overlays; };
+
           rust-toolchain =
             pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
-          dependencies = [
-            # System dependencies go here.
+          android-sdk =
+            inputs.android-nixpkgs.sdk.${system} (sdkPkgs: with sdkPkgs; [
+              cmdline-tools-latest
+              build-tools-34-0-0
+              ndk-25-2-9519653
+              platforms-android-33
+            ]);
+
+          dependencies = with pkgs; [
+            at-spi2-atk
+            cairo
+            gdk-pixbuf
+            glib
+            gtk3
+            harfbuzz
+            libsoup_3
+            openssl
+            pango
+            wayland
+            webkitgtk_4_1
+            xdotool
+            zlib
           ];
         in
         {
@@ -71,6 +97,8 @@
                 else throw "the Rust version must be `stable` or `nightly`";
 
               buildToolchain = version: with pkgs; [
+                dioxus-cli
+                nodejs
                 (rustToolchain version)
               ] ++ lib.optionals (!stdenv.isDarwin) [
                 clang
@@ -105,6 +133,23 @@
                 git
                 git-z
                 gitflow
+              ];
+
+              buildEnv = [
+                {
+                  name = "ANDROID_HOME";
+                  value = "${android-sdk}/share/android-sdk";
+                }
+                {
+                  name = "GRADLE_OPTS";
+                  value =
+                    "-Dorg.gradle.project.android.aapt2FromMavenOverride=" +
+                    "${android-sdk}/share/android-sdk/build-tools/34.0.0/aapt2";
+                }
+                {
+                  name = "JAVA_HOME";
+                  value = pkgs.jdk17.home;
+                }
               ];
 
               devEnv = [
@@ -155,7 +200,8 @@
                   ++ devTools;
 
                 env =
-                  devEnv
+                  buildEnv
+                  ++ devEnv
                   ++ ideEnv;
 
                 commands = [
@@ -210,6 +256,9 @@
                 packages =
                   buildToolchain "stable"
                   ++ checkToolchain;
+
+                env =
+                  buildEnv;
               };
 
               ci-nightly = { extraModulesPath, ... }: {
@@ -228,7 +277,8 @@
                   ++ nightlyCheckToolchain;
 
                 env =
-                  nightlyEnv;
+                  buildEnv
+                  ++ nightlyEnv;
               };
             };
         };
