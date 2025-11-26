@@ -32,6 +32,9 @@ debug = "commit used for debugging purposes, not to be integrated"
 # of valid scopes is required.
 accept = "list"
 list = [
+    # App
+    "app",
+
     # CLI
     "cli",
     "command",

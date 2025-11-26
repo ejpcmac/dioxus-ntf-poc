@@ -50,6 +50,7 @@ fn check(subcommand: Option<&str>) {
         None => {
             check_commits(&mut ctx);
             check_format(&mut ctx);
+            build_assets(&mut ctx);
             build(&mut ctx);
             check_doc(&mut ctx);
             test(&mut ctx);
@@ -58,11 +59,20 @@ fn check(subcommand: Option<&str>) {
         }
         Some("commits") => check_commits(&mut ctx),
         Some("format") => check_format(&mut ctx),
-        Some("build") => build(&mut ctx),
-        Some("doc") => check_doc(&mut ctx),
+        Some("build") => {
+            build_assets(&mut ctx);
+            build(&mut ctx);
+        }
+        Some("doc") => {
+            build_assets(&mut ctx);
+            check_doc(&mut ctx);
+        }
         Some("test") => test(&mut ctx),
         Some("coverage") => coverage(&mut ctx),
-        Some("unused-deps") => check_unused_deps(&mut ctx),
+        Some("unused-deps") => {
+            build_assets(&mut ctx);
+            check_unused_deps(&mut ctx);
+        }
         _ => check_usage(),
     }
 
@@ -150,23 +160,56 @@ fn check_format(ctx: &mut Context) {
     action!(ctx, "Checking for typos", "typos");
 }
 
+fn build_assets(ctx: &mut Context) {
+    action!(
+        ctx,
+        cwd: "ntf-app",
+        step!(
+            "Installing the npm dependencies for ntf-app",
+            "npm install",
+        ),
+        step!(
+            "Building the assets for ntf-app",
+            "npm run build",
+        ),
+    );
+}
+
 fn build(ctx: &mut Context) {
     action!(
         ctx,
-        "Building all packages for all feature combinations",
-        "cargo hack build --no-dev-deps --workspace --feature-powerset --skip rust-analyzer --keep-going",
+        "Building non-app packages for all feature combinations",
+        "cargo hack build --no-dev-deps --workspace --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
     );
 
     action!(
         ctx,
-        "Checking for clippy warnings in all packages for all feature combinations",
-        "cargo hack clippy --no-dev-deps --workspace --feature-powerset --skip rust-analyzer --keep-going -- -D warnings",
+        "Building ntf-app for all feature combinations",
+        "cargo hack build --no-dev-deps --package ntf-app --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going",
     );
 
     action!(
         ctx,
-        "Checking for clippy warnings in all packages for all targets and all feature combinations",
-        "cargo hack clippy --workspace --all-targets --feature-powerset --skip rust-analyzer --keep-going -- -D warnings",
+        "Checking for clippy warnings in non-app packages for all feature combinations",
+        "cargo hack clippy --no-dev-deps --workspace --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going -- -D warnings",
+    );
+
+    action!(
+        ctx,
+        "Checking for clippy warnings in ntf-app for all feature combinations",
+        "cargo hack clippy --no-dev-deps --package ntf-app --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going -- -D warnings",
+    );
+
+    action!(
+        ctx,
+        "Checking for clippy warnings in non-app packages for all targets and all feature combinations",
+        "cargo hack clippy --workspace --exclude ntf-app --all-targets --feature-powerset --skip rust-analyzer --keep-going -- -D warnings",
+    );
+
+    action!(
+        ctx,
+        "Checking for clippy warnings in ntf-app for all targets and all feature combinations",
+        "cargo hack clippy --package ntf-app --all-targets --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going -- -D warnings",
     );
 }
 
@@ -175,8 +218,14 @@ fn check_doc(ctx: &mut Context) {
 
     action!(
         ctx,
-        "Checking that the documentation builds without warnings",
-        "cargo hack doc --no-deps --document-private-items --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going"
+        "Checking that the documentation builds without warnings for non-app packages",
+        "cargo hack doc --no-deps --document-private-items --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going"
+    );
+
+    action!(
+        ctx,
+        "Checking that the documentation builds without warnings for ntf-app",
+        "cargo hack doc --no-deps --document-private-items --package ntf-app --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going"
     );
 }
 
@@ -184,16 +233,16 @@ fn test(ctx: &mut Context) {
     action!(
         ctx,
         step!(
-            "Building the tests for all packages for all feature combinations",
-            "cargo hack nextest run --no-run --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going",
+            "Building the tests for non-app packages for all feature combinations",
+            "cargo hack nextest run --no-run --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
         ),
         step!(
-            "Running the tests for all packages for all feature combinations",
-            "cargo hack nextest run --no-tests=warn --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going",
+            "Running the tests for non-app packages for all feature combinations",
+            "cargo hack nextest run --no-tests=warn --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
         ),
         // step!(
-        //     "Running the doctests for all packages for all feature combinations",
-        //     "cargo hack test --doc --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going",
+        //     "Running the doctests for non-app packages for all feature combinations",
+        //     "cargo hack test --doc --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
         // ),
     );
 }
@@ -207,12 +256,12 @@ fn coverage(ctx: &mut Context) {
                 "cargo +nightly llvm-cov clean --workspace"
             ),
             step!(
-                "Running the tests with coverage for all packages with all feature combinations",
-                "cargo +nightly hack llvm-cov nextest --branch --no-report --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going --no-tests=warn",
+                "Running the tests with coverage for non-app packages with all feature combinations",
+                "cargo +nightly hack llvm-cov nextest --branch --no-report --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going --no-tests=warn",
             ),
             // step!(
-            //     "Running the doctests with coverage for all packages with all feature combinations",
-            //     "cargo +nightly hack llvm-cov test --branch --no-report --doc --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going",
+            //     "Running the doctests with coverage for non-app packages with all feature combinations",
+            //     "cargo +nightly hack llvm-cov test --branch --no-report --doc --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
             // ),
             step!(
                 "Generating the coverage report",
@@ -230,12 +279,12 @@ fn coverage(ctx: &mut Context) {
                 "nix develop -L .#rust-nightly -c cargo llvm-cov clean --workspace"
             ),
             step!(
-                "Running the tests with coverage for all packages with all feature combinations",
-                "nix develop -L .#rust-nightly -c cargo hack llvm-cov nextest --branch --no-report --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going --no-tests=warn",
+                "Running the tests with coverage for non-app packages with all feature combinations",
+                "nix develop -L .#rust-nightly -c cargo hack llvm-cov nextest --branch --no-report --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going --no-tests=warn",
             ),
             // step!(
-            //     "Running the doctests with coverage for all packages with all feature combinations",
-            //     "nix develop -L .#rust-nightly -c cargo hack llvm-cov test --branch --no-report --doc --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going",
+            //     "Running the doctests with coverage for non-app packages with all feature combinations",
+            //     "nix develop -L .#rust-nightly -c cargo hack llvm-cov test --branch --no-report --doc --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
             // ),
             step!(
                 "Generating the coverage report",
@@ -253,12 +302,12 @@ fn coverage(ctx: &mut Context) {
                 "cargo llvm-cov clean --workspace"
             ),
             step!(
-                "Running the tests with coverage for all packages with all feature combinations",
-                "cargo hack llvm-cov nextest --branch --no-report --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going --no-tests=warn",
+                "Running the tests with coverage for non-app packages with all feature combinations",
+                "cargo hack llvm-cov nextest --branch --no-report --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going --no-tests=warn",
             ),
             // step!(
-            //     "Running the doctests with coverage for all packages with all feature combinations",
-            //     "cargo hack llvm-cov test --branch --no-report --doc --workspace --exclude xtask --feature-powerset --skip rust-analyzer --keep-going",
+            //     "Running the doctests with coverage for non-app packages with all feature combinations",
+            //     "cargo hack llvm-cov test --branch --no-report --doc --workspace --exclude xtask --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
             // ),
             step!(
                 "Generating the coverage report",
@@ -277,40 +326,76 @@ fn check_unused_deps(ctx: &mut Context) {
         NightlyCallMethod::Cargo => {
             action!(
                 ctx,
-                "Looking for unused dependencies",
-                "cargo +nightly hack udeps --workspace --feature-powerset --skip rust-analyzer --keep-going",
+                "Looking for unused dependencies in non-app packages",
+                "cargo +nightly hack udeps --workspace --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
             );
 
             action!(
                 ctx,
-                "Looking for unused dev-dependencies",
-                "cargo +nightly hack udeps --workspace --all-targets --feature-powerset --skip rust-analyzer --keep-going",
+                "Looking for unused dependencies in ntf-app",
+                "cargo +nightly hack udeps --package ntf-app --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going",
+            );
+
+            action!(
+                ctx,
+                "Looking for unused dev-dependencies in non-app packages",
+                "cargo +nightly hack udeps --workspace --exclude ntf-app --all-targets --feature-powerset --skip rust-analyzer --keep-going",
+            );
+
+            action!(
+                ctx,
+                "Looking for unused dev-dependencies in ntf-app",
+                "cargo +nightly hack udeps --package ntf-app --all-targets --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going",
             );
         }
         NightlyCallMethod::Nix => {
             action!(
                 ctx,
-                "Looking for unused dependencies",
-                "nix develop -L .#rust-nightly -c cargo hack udeps --workspace --feature-powerset --skip rust-analyzer --keep-going",
+                "Looking for unused dependencies in non-app packages",
+                "nix develop -L .#rust-nightly -c cargo hack udeps --workspace --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
             );
 
             action!(
                 ctx,
-                "Looking for unused dev-dependencies",
-                "nix develop -L .#rust-nightly -c cargo hack udeps --workspace --all-targets --feature-powerset --skip rust-analyzer --keep-going",
+                "Looking for unused dependencies in ntf-app",
+                "nix develop -L .#rust-nightly -c cargo hack udeps --package ntf-app --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going",
+            );
+
+            action!(
+                ctx,
+                "Looking for unused dev-dependencies in non-app packages",
+                "nix develop -L .#rust-nightly -c cargo hack udeps --workspace --exclude ntf-app --all-targets --feature-powerset --skip rust-analyzer --keep-going",
+            );
+
+            action!(
+                ctx,
+                "Looking for unused dev-dependencies in ntf-app",
+                "nix develop -L .#rust-nightly -c cargo hack udeps --package ntf-app --all-targets --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going",
             );
         }
         NightlyCallMethod::AlreadyNightly => {
             action!(
                 ctx,
-                "Looking for unused dependencies",
-                "cargo hack udeps --workspace --feature-powerset --skip rust-analyzer --keep-going",
+                "Looking for unused dependencies in non-app packages",
+                "cargo hack udeps --workspace --exclude ntf-app --feature-powerset --skip rust-analyzer --keep-going",
             );
 
             action!(
                 ctx,
-                "Looking for unused dev-dependencies",
-                "cargo hack udeps --workspace --all-targets --feature-powerset --skip rust-analyzer --keep-going",
+                "Looking for unused dependencies in ntf-app",
+                "cargo hack udeps --package ntf-app --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going",
+            );
+
+            action!(
+                ctx,
+                "Looking for unused dev-dependencies in non-app packages",
+                "cargo hack udeps --workspace --exclude ntf-app --all-targets --feature-powerset --skip rust-analyzer --keep-going",
+            );
+
+            action!(
+                ctx,
+                "Looking for unused dev-dependencies in ntf-app",
+                "cargo hack udeps --package ntf-app --all-targets --feature-powerset --at-least-one-of desktop,mobile --mutually-exclusive-features desktop,mobile --skip rust-analyzer --keep-going",
             );
         }
     }

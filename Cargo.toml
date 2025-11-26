@@ -3,12 +3,13 @@ resolver = "3"
 members = [
     "ntf-api",
     "ntf-api-types",
+    "ntf-app",
     "ntf-cli",
     "ntf-poc-helpers",
     "ntf-srv",
     "xtask",
 ]
-default-members = ["ntf-cli", "ntf-poc-helpers"]
+default-members = ["ntf-app", "ntf-cli"]
 
 [workspace.package]
 version = "0.1.0-dev.0"
@@ -21,6 +22,12 @@ rust-version = "1.85"
 
 [profile.dev]
 debug = "line-tables-only"
+
+[profile.desktop-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"
 
 [workspace.lints.rust]
 # Forbidden
