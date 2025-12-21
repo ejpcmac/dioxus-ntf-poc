@@ -1,2 +1,5 @@
 *.lock
 *.md
+
+# Generated files
+ntf-app/assets/app.css
